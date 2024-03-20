@@ -22,8 +22,8 @@ class HDR:
         imgs_gray = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             for img in self.imgs]
         resize_time = 5
-        dx = 0
-        dy = 0
+        dx = [0] * len(imgs_gray)
+        dy = [0] * len(imgs_gray)
         for t in range(resize_time):
             imgs_resize = [cv2.resize(img, None,
                 0.5 ** (resize_time - t), 0.5 ** (resize_time -t))
