@@ -16,6 +16,18 @@ class HDR:
         img = cv2.imdecode(np.fromfile(filename, dtype=np.uint8), -1)
         self.imgs.append(img)
         self.ltimes.append(ltime)
+    
+    def alignment(self):
+        '''圖片對齊'''
+        imgs_gray = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            for img in self.imgs]
+        resize_time = 5
+        dx = 0
+        dy = 0
+        for t in range(resize_time):
+            imgs_resize = [cv2.resize(img, None,
+                0.5 ** (resize_time - t), 0.5 ** (resize_time -t))
+                for img in imgs_gray]
 
 if __name__ == "__main__":
     obj = HDR()
