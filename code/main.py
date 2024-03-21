@@ -84,6 +84,6 @@ if __name__ == "__main__":
     obj.openImage(r"./data/PPT範例亮圖.png", 0)
     obj.openImage(r"./data/PPT範例暗圖.png", -1)
     obj.alignment()
-    #for img, ltime in zip(obj.imgs, obj.ltimes):
-    #    cv2.imshow(str(ltime), img)
+    for img, ltime in zip(obj.imgs, obj.ltimes):
+        cv2.imshow(str(ltime), img)
     cv2.waitKey(0)
