@@ -34,7 +34,7 @@ class HDR:
         dx = [0] * (len(imgs_gray)-1)
         dy = [0] * (len(imgs_gray)-1)
         for t in range(resize_time, -1, -1):
-            print(f"alignment: 縮放比{2**t} 計算開始")
+            print(f"alignment: 縮放比1/{2**t} 計算開始")
             scale = 0.5 ** t
             imgs_resize = [cv2.resize(img, None, fx=scale, fy=scale)
                 for img in imgs_gray]
@@ -63,7 +63,7 @@ class HDR:
                         min_dy = dy0
                 dx[i] = min_dx
                 dy[i] = min_dy
-            print(f"alignment: 縮放比{2**t} 計算完成")
+            print(f"alignment: 縮放比1/{2**t} 計算完成")
         dx = [0] + list(itertools.accumulate(dx))
         mn = min(dx)
         dx = [n - mn for n in dx]
@@ -76,12 +76,14 @@ class HDR:
             zip(imgs_gray, dy))
         self.imgs = [img[dx0:dx0+szx, dy0:dy0+szy, :]
             for img, dx0, dy0 in zip(self.imgs, dx, dy)]
+    def makeHDR(self, filename: str):
+        '''重建HDR'''
 
 if __name__ == "__main__":
     obj = HDR()
     obj.openImage(r"./data/PPT範例亮圖.png", 0)
     obj.openImage(r"./data/PPT範例暗圖.png", -1)
     obj.alignment()
-    for img, ltime in zip(obj.imgs, obj.ltimes):
-        cv2.imshow(str(ltime), img)
+    #for img, ltime in zip(obj.imgs, obj.ltimes):
+    #    cv2.imshow(str(ltime), img)
     cv2.waitKey(0)
