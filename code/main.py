@@ -34,8 +34,10 @@ class HDR:
         dx = [0] * (len(imgs_gray)-1)
         dy = [0] * (len(imgs_gray)-1)
         for t in range(resize_time, -1, -1):
-            imgs_resize = [cv2.resize(img, None,
-                0.5 ** t, 0.5 ** t) for img in imgs_gray]
+            print(f"alignment: 縮放比{2**t} 計算開始")
+            scale = 0.5 ** t
+            imgs_resize = [cv2.resize(img, None, fx=scale, fy=scale)
+                for img in imgs_gray]
             thresholds = [np.percentile(data, [30, 70])
                 for data in imgs_resize]
             dx = [x*2 for x in dx]
@@ -61,20 +63,25 @@ class HDR:
                         min_dy = dy0
                 dx[i] = min_dx
                 dy[i] = min_dy
-        dx = [0] + itertools.accumulate(dx)
+            print(f"alignment: 縮放比{2**t} 計算完成")
+        dx = [0] + list(itertools.accumulate(dx))
         mn = min(dx)
         dx = [n - mn for n in dx]
-        dy = [0] + itertools.accumulate(dy)
+        dy = [0] + list(itertools.accumulate(dy))
         mn = min(dy)
         dy = [n - mn for n in dy]
         szx = min(p.shape[0] - d for p,d in
             zip(imgs_gray, dx))
         szy = min(p.shape[1] - d for p,d in
             zip(imgs_gray, dy))
+        self.imgs = [img[dx0:dx0+szx, dy0:dy0+szy, :]
+            for img, dx0, dy0 in zip(self.imgs, dx, dy)]
 
 if __name__ == "__main__":
     obj = HDR()
     obj.openImage(r"./data/PPT範例亮圖.png", 0)
     obj.openImage(r"./data/PPT範例暗圖.png", -1)
-    cv2.imshow(str(obj.ltimes[0]), obj.imgs[0])
+    obj.alignment()
+    for img, ltime in zip(obj.imgs, obj.ltimes):
+        cv2.imshow(str(ltime), img)
     cv2.waitKey(0)
