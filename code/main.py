@@ -98,6 +98,19 @@ class HDR:
                 smooth_msk = smooth < smooth_constant
             else:
                 smooth_msk = smooth_msk & (smooth < smooth_constant)
+        
+        middle_msk = None
+        for img in self.imgs:
+            msk = img[3:-3, 3:-3] >= 84 & img[3:-3, 3:-3] <= 170
+            if middle_msk is None:
+                middle_msk = msk
+            else:
+                middle_msk = middle_msk | msk
+        
+        all_msk = smooth_msk & middle_msk
+        dots = np.column_stack(np.where(all_msk))
+        np.random.shuffle(dots)
+        return dots[ : dot_num]
 
     def makeHDR(self, filename: str):
         '''重建HDR'''
