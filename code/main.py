@@ -2,7 +2,9 @@ import cv2
 import numpy as np
 import os
 import itertools
+print("載入模組scipy中...")
 from scipy.signal import convolve2d
+print("載入模組scipy成功")
 os.chdir(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 class HDR:
     '''主要操作的物件'''
@@ -15,6 +17,7 @@ class HDR:
     
     def openImage(self, filename: str, ltime: int):
         '''加入一個圖檔和該圖的曝光時間對2的對數'''
+        print(f"{filename}載入中...")
         img = cv2.imdecode(np.fromfile(filename, dtype=np.uint8), -1)
         self.imgs.append(img)
         self.ltimes.append(ltime)
@@ -59,8 +62,8 @@ class HDR:
                     sub_p2 = p2[start[0]+dx0 : end[0]+dx0,
                                 start[1]+dy0 : end[1]+dy0]
                     cnt = np.count_nonzero(
-                        (sub_p1 <= t1[0] & sub_p2 >= t2[1]) | 
-                        (sub_p1 >= t1[1] & sub_p2 <= t2[0]))
+                        ((sub_p1 <= t1[0]) & (sub_p2 >= t2[1])) | 
+                        ((sub_p1 >= t1[1]) & (sub_p2 <= t2[0])))
                     if min_cnt is None or cnt < min_cnt:
                         min_cnt = cnt
                         min_dx = dx0
@@ -83,33 +86,30 @@ class HDR:
     
     def aladot(self, dot_num: int):
         '''回傳dot_num個適合做HDR分析的點'''
-        smooth_constant = 50
 
-        msk = np.ones((7, 7))
+        msk = np.ones((7, 7), dtype=np.int16)
         msk[1:-1, 1:-1] = 2
         msk[2:-2, 2:-2] = 3
         msk[3, 3] = 0
-        msk /= np.sum(msk)
-        smooth_msk = None
+        msk_sum = np.sum(msk)
+        new_shape = (self.imgs[0].shape[0]-6,
+                     self.imgs[0].shape[1]-6)
+        smooth_msk = np.ones(new_shape, dtype=bool)
+        middle_msk = np.zeros(new_shape, dtype=bool)
         for img in self.imgs:
-            smooth = np.abs(img[3:-3, 3:-3] -
-                convolve2d(img, msk, mode="valid"))
-            if smooth_msk is None:
-                smooth_msk = smooth < smooth_constant
-            else:
-                smooth_msk = smooth_msk & (smooth < smooth_constant)
-        
-        middle_msk = None
-        for img in self.imgs:
-            msk = img[3:-3, 3:-3] >= 84 & img[3:-3, 3:-3] <= 170
-            if middle_msk is None:
-                middle_msk = msk
-            else:
-                middle_msk = middle_msk | msk
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.int16)
+            sub_img = img[3:-3, 3:-3]
+            smooth = np.abs(sub_img -
+                convolve2d(img, msk, mode="valid") / msk_sum)
+            smooth_msk &= (smooth < 20)
+            middle_msk |= ((sub_img >= 84) &
+                           (sub_img <= 170))
         
         all_msk = smooth_msk & middle_msk
-        dots = np.column_stack(np.where(all_msk))
+        dots = np.column_stack(np.where(all_msk)) + (3, 3)
         np.random.shuffle(dots)
+        if dots.shape[0] < dot_num:
+            print(f"取點錯誤:只有{dots.shape[0]}個可選的點，無法取到{dot_num}個點")
         return dots[ : dot_num]
 
     def makeHDR(self, filename: str):
@@ -120,6 +120,10 @@ if __name__ == "__main__":
     obj.openImage(r"./data/PPT範例亮圖.png", 0)
     obj.openImage(r"./data/PPT範例暗圖.png", -1)
     obj.alignment()
+    dots = obj.aladot(10000)
+    for img in obj.imgs:
+        for dot in dots:
+            cv2.circle(img, (dot[1], dot[0]), 2, (0, 255, 0), -1)
     for img, ltime in zip(obj.imgs, obj.ltimes):
         cv2.imshow(str(ltime), img)
     cv2.waitKey(0)
