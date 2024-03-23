@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import os
 import itertools
+from scipy.signal import convolve2d
 os.chdir(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 class HDR:
     '''主要操作的物件'''
@@ -76,6 +77,25 @@ class HDR:
             zip(imgs_gray, dy))
         self.imgs = [img[dx0:dx0+szx, dy0:dy0+szy, :]
             for img, dx0, dy0 in zip(self.imgs, dx, dy)]
+    
+    def aladot(self, dot_num: int):
+        '''回傳dot_num個適合做HDR分析的點'''
+        smooth_constant = 50
+
+        msk = np.ones((7, 7))
+        msk[1:-1, 1:-1] = 2
+        msk[2:-2, 2:-2] = 3
+        msk[3, 3] = 0
+        msk /= np.sum(msk)
+        smooth_msk = None
+        for img in self.imgs:
+            smooth = np.abs(img[3:-3, 3:-3] -
+                convolve2d(img, msk, mode="valid"))
+            if smooth_msk is None:
+                smooth_msk = smooth < smooth_constant
+            else:
+                smooth_msk = smooth_msk & (smooth < smooth_constant)
+
     def makeHDR(self, filename: str):
         '''重建HDR'''
 
