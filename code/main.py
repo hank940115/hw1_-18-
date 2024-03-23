@@ -49,15 +49,18 @@ class HDR:
                 t1 = thresholds[i]
                 p2 = imgs_resize[i+1]
                 t2 = thresholds[i+1]
+                start = (max(0, -dx[i]+1),
+                         max(0, -dy[i]+1))
+                end = (min(p1.shape[0], p2.shape[0]-dx[i]-1),
+                       min(p1.shape[1], p2.shape[1]-dy[i]-1))
+                sub_p1 = p1[start[0] : end[0], start[1] : end[1]]
                 for dx0, dy0 in itertools.product(
                     range(dx[i]-1, dx[i]+2), range(dy[i]-1, dy[i]+2)):
-                    cnt = 0
-                    for x, y in itertools.product(
-                        range(dx[i]+1, min(p1.shape[0], p2.shape[0]-dx[i]-1)),
-                        range(dy[i]+1, min(p1.shape[1], p2.shape[1]-dy[i]-1))):
-                        if ((p1[x, y] <= t1[0] and p2[x+dx0, y+dy0] >= t2[1])
-                            or (p1[x, y] >= t1[1] and p2[x+dx0, y+dy0] <= t2[0])):
-                            cnt += 1
+                    sub_p2 = p2[start[0]+dx0 : end[0]+dx0,
+                                start[1]+dy0 : end[1]+dy0]
+                    cnt = np.count_nonzero(
+                        (sub_p1 <= t1[0] & sub_p2 >= t2[1]) | 
+                        (sub_p1 >= t1[1] & sub_p2 <= t2[0]))
                     if min_cnt is None or cnt < min_cnt:
                         min_cnt = cnt
                         min_dx = dx0
