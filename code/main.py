@@ -93,7 +93,7 @@ class HDR:
         smooth_msk = np.ones(self.imgs[0].shape[:2], dtype=bool)
         middle_msk = np.zeros(self.imgs[0].shape[:2], dtype=bool)
         for img in self.imgs:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.int16)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             smooth_msk &= (maximum_filter(img, size=msk_shape) -
                            minimum_filter(img, size=msk_shape) < 50)
             middle_msk |= ((img >= 84) & (img <= 170))
@@ -106,8 +106,21 @@ class HDR:
             print(f"取點錯誤:只有{dots.shape[0]}個可選的點，無法取到{dot_num}個點")
         return dots[ : dot_num]
 
-    def makeHDR(self, filename: str):
+    def makeHDR(self, filename: str, smooth_coustant: float = 0.1):
         '''重建HDR'''
+
+        w = (lambda num: float(num) / 128 if num <= 128
+            else float(256-num) / 128)
+        pic_num = len(self.imgs)
+        dot_num = int(256 * 2 / (pic_num - 1))
+        dots = self.aladot(dot_num)
+        A = np.zeros((dot_num * pic_num + 255, 256 + dot_num),
+                     dtype=np.float64)
+        B = np.zeros((dot_num * pic_num + 255,), dtype=np.float64)
+        index = 0
+        for img, ltime in zip(self.imgs, self.ltimes):
+            for dot in dots:
+
 
 if __name__ == "__main__":
     obj = HDR()
