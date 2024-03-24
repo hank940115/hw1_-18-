@@ -114,13 +114,13 @@ class HDR:
         pic_num = len(self.imgs)
         dot_num = int(256 * 2 / (pic_num - 1))
         dots = self.aladot(dot_num)
-        A = np.zeros((dot_num * pic_num + 255, 256 + dot_num),
-                     dtype=np.float64)
-        B = np.zeros((dot_num * pic_num + 255,), dtype=np.float64)
-        index = 0
-        for img, ltime in zip(self.imgs, self.ltimes):
-            for dot in dots:
-
+        for clr in range(0, 3):
+            A = np.zeros((dot_num * pic_num + 255, 256 + dot_num),
+                        dtype=np.float64)
+            B = np.zeros((dot_num * pic_num + 255,), dtype=np.float64)
+            index = 0
+            for img, ltime in zip(self.imgs, self.ltimes):
+                for di, dot in enumerate(dots):
 
 if __name__ == "__main__":
     obj = HDR()
