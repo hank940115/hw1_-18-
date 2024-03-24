@@ -117,40 +117,41 @@ class HDR:
         dot_num = int(256 * 2 / (pic_num - 1))
         dots = self.aladot(dot_num)
         dot_num = dots.shape[0]
-        hdr = np.zeros((self.imgs[0].shape[0], self.imgs[0].shape[1],
-                        3), dtype=np.float64)
-        for clr in range(0, 3):
-            print(f"構建HDR的第{clr}個顏色中...", end="\r")
-            A = np.zeros((dot_num * pic_num + 255, 256 + dot_num),
-                        dtype=np.float64)
-            B = np.zeros((dot_num * pic_num + 255,), dtype=np.float64)
-            index = 0
-            for img, ltime in zip(self.imgs, self.ltimes):
-                for di, dot in enumerate(dots):
-                    value = img[*dot, clr]
+        print(f"構建HDR中...", end="\r")
+        A = np.zeros((dot_num * pic_num * 3 + 255, 256 + dot_num * 3),
+                    dtype=np.float64)
+        B = np.zeros((dot_num * pic_num * 3 + 255,), dtype=np.float64)
+        index = 0
+        for img, ltime in zip(self.imgs, self.ltimes):
+            di = 0
+            for dot in dots:
+                for value in img[*dot][:3]:
                     wvalue = w(value)
                     A[index, value] = wvalue
                     A[index, 256+di] = -wvalue
                     B[index] = wvalue * ltime
                     index += 1
-            A[index, 127] = 1000
-            B[index] = 0
+                    di += 1
+        A[index, 127] = 1000
+        B[index] = 0
+        index += 1
+        for value in range(1, 255):
+            co = w(value) * smooth_coustant
+            A[index, value-1] = co
+            A[index, value] = co * 2
+            A[index, value+1] = co
             index += 1
-            for value in range(1, 255):
-                co = w(value) * smooth_coustant
-                A[index, value-1] = co
-                A[index, value] = co * 2
-                A[index, value+1] = co
-                index += 1
-            g_func = np.linalg.lstsq(A, B, rcond=None)[0][:256]
-            div_up = np.zeros(self.imgs[0].shape[:2], dtype=np.float64)
-            div_down = np.zeros(self.imgs[0].shape[:2], dtype=np.float64)
-            for img, ltime in zip(self.imgs, self.ltimes):
-                w_co = wnp(img[:, :, clr])
-                div_down += w_co
-                div_up += w_co * (g_func[img[:, :, clr]] - ltime)
-            hdr[:, :, clr] = np.power(2, div_up / div_down)
-            print(f"構建HDR的第{clr}個顏色完成")
+        g_func = np.linalg.lstsq(A, B, rcond=None)[0][:256]
+        div_up = np.zeros((*self.imgs[0].shape[:2], 3),
+                          dtype=np.float64)
+        div_down = np.zeros((*self.imgs[0].shape[:2], 3),
+                            dtype=np.float64)
+        for img, ltime in zip(self.imgs, self.ltimes):
+            w_co = wnp(img[:, :, :3])
+            div_down += w_co
+            div_up += w_co * (g_func[img[:, :, :3]] - ltime)
+        hdr = np.power(2, div_up / div_down)
+        print(f"構建HDR完成")
         pyexr.write(filename, hdr)
 
 if __name__ == "__main__":
