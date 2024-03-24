@@ -116,6 +116,7 @@ class HDR:
         pic_num = len(self.imgs)
         dot_num = int(256 * 2 / (pic_num - 1))
         dots = self.aladot(dot_num)
+        dot_num = dots.shape[0]
         hdr = np.zeros((self.imgs[0].shape[0], self.imgs[0].shape[1],
                         3), dtype=np.float64)
         for clr in range(0, 3):
@@ -132,7 +133,7 @@ class HDR:
                     A[index, 256+di] = -wvalue
                     B[index] = wvalue * ltime
                     index += 1
-            A[index, 127] = 1
+            A[index, 127] = 1000
             B[index] = 0
             index += 1
             for value in range(1, 255):
@@ -148,7 +149,7 @@ class HDR:
                 w_co = wnp(img[:, :, clr])
                 div_down += w_co
                 div_up += w_co * (g_func[img[:, :, clr]] - ltime)
-            hdr[:, :, clr] = np.exp(div_up / div_down)
+            hdr[:, :, clr] = np.power(2, div_up / div_down)
             print(f"構建HDR的第{clr}個顏色完成")
         pyexr.write(filename, hdr)
 
