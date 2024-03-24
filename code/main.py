@@ -5,6 +5,7 @@ import itertools
 print("載入模組scipy中...", end="\r")
 from scipy.ndimage import maximum_filter, minimum_filter
 print("載入模組scipy成功")
+import pyexr
 os.chdir(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 class HDR:
     '''主要操作的物件'''
@@ -109,28 +110,52 @@ class HDR:
     def makeHDR(self, filename: str, smooth_coustant: float = 0.1):
         '''重建HDR'''
 
+        wnp = (lambda num: 1 - np.abs(num.astype(np.float64) - 128) / 129)
         w = (lambda num: float(num) / 128 if num <= 128
             else float(256-num) / 128)
         pic_num = len(self.imgs)
         dot_num = int(256 * 2 / (pic_num - 1))
         dots = self.aladot(dot_num)
+        hdr = np.zeros((self.imgs[0].shape[0], self.imgs[0].shape[1],
+                        3), dtype=np.float64)
         for clr in range(0, 3):
+            print(f"構建HDR的第{clr}個顏色中...", end="\r")
             A = np.zeros((dot_num * pic_num + 255, 256 + dot_num),
                         dtype=np.float64)
             B = np.zeros((dot_num * pic_num + 255,), dtype=np.float64)
             index = 0
             for img, ltime in zip(self.imgs, self.ltimes):
                 for di, dot in enumerate(dots):
+                    value = img[*dot, clr]
+                    wvalue = w(value)
+                    A[index, value] = wvalue
+                    A[index, 256+di] = -wvalue
+                    B[index] = wvalue * ltime
+                    index += 1
+            A[index, 127] = 1
+            B[index] = 0
+            index += 1
+            for value in range(1, 255):
+                co = w(value) * smooth_coustant
+                A[index, value-1] = co
+                A[index, value] = co * 2
+                A[index, value+1] = co
+                index += 1
+            g_func = np.linalg.lstsq(A, B, rcond=None)[0][:256]
+            div_up = np.zeros(self.imgs[0].shape[:2], dtype=np.float64)
+            div_down = np.zeros(self.imgs[0].shape[:2], dtype=np.float64)
+            for img, ltime in zip(self.imgs, self.ltimes):
+                w_co = wnp(img[:, :, clr])
+                div_down += w_co
+                div_up += w_co * (g_func[img[:, :, clr]] - ltime)
+            hdr[:, :, clr] = np.exp(div_up / div_down)
+            print(f"構建HDR的第{clr}個顏色完成")
+        pyexr.write(filename, hdr)
 
 if __name__ == "__main__":
     obj = HDR()
     obj.openImage(r"./data/PPT範例亮圖.png", 0)
     obj.openImage(r"./data/PPT範例暗圖.png", -1)
     obj.alignment()
-    dots = obj.aladot(10000)
-    for img in obj.imgs:
-        for dot in dots:
-            cv2.circle(img, (dot[1], dot[0]), 2, (0, 255, 0), -1)
-    for img, ltime in zip(obj.imgs, obj.ltimes):
-        cv2.imshow(str(ltime), img)
+    obj.makeHDR(r"./hdr圖.exr")
     cv2.waitKey(0)
