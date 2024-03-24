@@ -2,8 +2,8 @@ import cv2
 import numpy as np
 import os
 import itertools
-print("載入模組scipy中...")
-from scipy.signal import convolve2d
+print("載入模組scipy中...", end="\r")
+from scipy.ndimage import maximum_filter, minimum_filter
 print("載入模組scipy成功")
 os.chdir(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 class HDR:
@@ -17,8 +17,9 @@ class HDR:
     
     def openImage(self, filename: str, ltime: int):
         '''加入一個圖檔和該圖的曝光時間對2的對數'''
-        print(f"{filename}載入中...")
+        print(f"{filename}載入中...", end="\r")
         img = cv2.imdecode(np.fromfile(filename, dtype=np.uint8), -1)
+        print(f"{filename}載入成功")
         self.imgs.append(img)
         self.ltimes.append(ltime)
     
@@ -38,7 +39,7 @@ class HDR:
         dx = [0] * (len(imgs_gray)-1)
         dy = [0] * (len(imgs_gray)-1)
         for t in range(resize_time, -1, -1):
-            print(f"alignment: 縮放比1/{2**t} 計算開始")
+            print(f"alignment: 縮放比1/{2**t} 計算中...", end="\r")
             scale = 0.5 ** t
             imgs_resize = [cv2.resize(img, None, fx=scale, fy=scale)
                 for img in imgs_gray]
@@ -86,28 +87,21 @@ class HDR:
     
     def aladot(self, dot_num: int):
         '''回傳dot_num個適合做HDR分析的點'''
+        msk_shape = 20
+        print("取點中...", end="\r")
 
-        msk = np.ones((7, 7), dtype=np.int16)
-        msk[1:-1, 1:-1] = 2
-        msk[2:-2, 2:-2] = 3
-        msk[3, 3] = 0
-        msk_sum = np.sum(msk)
-        new_shape = (self.imgs[0].shape[0]-6,
-                     self.imgs[0].shape[1]-6)
-        smooth_msk = np.ones(new_shape, dtype=bool)
-        middle_msk = np.zeros(new_shape, dtype=bool)
+        smooth_msk = np.ones(self.imgs[0].shape[:2], dtype=bool)
+        middle_msk = np.zeros(self.imgs[0].shape[:2], dtype=bool)
         for img in self.imgs:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.int16)
-            sub_img = img[3:-3, 3:-3]
-            smooth = np.abs(sub_img -
-                convolve2d(img, msk, mode="valid") / msk_sum)
-            smooth_msk &= (smooth < 20)
-            middle_msk |= ((sub_img >= 84) &
-                           (sub_img <= 170))
+            smooth_msk &= (maximum_filter(img, size=msk_shape) -
+                           minimum_filter(img, size=msk_shape) < 50)
+            middle_msk |= ((img >= 84) & (img <= 170))
         
         all_msk = smooth_msk & middle_msk
-        dots = np.column_stack(np.where(all_msk)) + (3, 3)
+        dots = np.column_stack(np.where(all_msk))
         np.random.shuffle(dots)
+        print("取點結束")
         if dots.shape[0] < dot_num:
             print(f"取點錯誤:只有{dots.shape[0]}個可選的點，無法取到{dot_num}個點")
         return dots[ : dot_num]
