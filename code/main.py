@@ -6,6 +6,7 @@ print("載入模組scipy中...", end="\r")
 from scipy.ndimage import maximum_filter, minimum_filter
 print("載入模組scipy成功")
 import pyexr
+import math
 os.chdir(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 class HDR:
     '''主要操作的物件'''
@@ -107,7 +108,7 @@ class HDR:
             print(f"取點錯誤:只有{dots.shape[0]}個可選的點，無法取到{dot_num}個點")
         return dots[ : dot_num]
 
-    def makeHDR(self, filename: str, smooth_coustant: float = 0.1):
+    def makeHDR(self, filename: str = None, smooth_coustant: float = 100.0):
         '''重建HDR'''
 
         wnp = (lambda num: 1 - np.abs(num.astype(np.float64) - 128) / 129)
@@ -133,13 +134,13 @@ class HDR:
                     A[index, 256+di] = -wvalue
                     B[index] = wvalue * ltime
                     index += 1
-            A[index, 127] = 1000
+            A[index, 127] = 10000
             B[index] = 0
             index += 1
             for value in range(1, 255):
                 co = w(value) * smooth_coustant
                 A[index, value-1] = co
-                A[index, value] = co * 2
+                A[index, value] = -co * 2
                 A[index, value+1] = co
                 index += 1
             g_func = np.linalg.lstsq(A, B, rcond=None)[0][:256]
@@ -150,8 +151,42 @@ class HDR:
                 div_down += w_co
                 div_up += w_co * (g_func[img[:, :, clr]] - ltime)
             hdr[:, :, clr] = np.power(2, div_up / div_down)
+            # for index, number in enumerate(g_func):
+            #     print(index, number)
+            # input()
             print(f"構建HDR的第{clr}個顏色完成")
-        pyexr.write(filename, hdr)
+        if filename is not None:
+            pyexr.write(filename, hdr)
+        self.hdr = hdr
+
+    def tonemappingL(self, filename: str = None, a: float = 1.0,
+                     b: float = 0.0, Lwhite: float = 1e10):
+        Laver = np.exp(np.sum(np.log(self.hdr + b)) / self.hdr.size)
+        Lm = self.hdr * a / Laver
+        Ld = (Lm / Lwhite / Lwhite + 1) * Lm / (Lm + 1)
+        tone = (np.clip(Ld, 0.0, 1.0) * 255).astype(np.uint8)
+        if filename is not None:
+            cv2.imwrite(filename, tone)
+        self.tone = tone
+    
+    def tonemappingBil(self, filename: str = None, smooth_contant: int = 20):
+        inten = np.mean(self.hdr, axis=-1)
+        color = self.hdr / inten
+        msk = np.stack(np.indices((smooth_contant*2+1,
+                                   smooth_contant*2+1)), axis=-1)
+        msk = np.sum(np.power(msk - smooth_contant, 2), axis=-1)
+        msk = np.exp(-msk / (smooth_contant * smooth_contant / 2))
+        msk /= smooth_contant * math.sqrt(math.pi / 2)
+        div_up = np.zeros(inten.shape, dtype=np.float64)
+        div_down = np.zeros(inten.shape, dtype=np.float64)
+        for dx, dy in itertools.product(range(-smooth_contant, smooth_contant+1,
+                                        -smooth_contant, smooth_contant+1)):
+            origin = inten[max(0, dx) : min(0, dx),
+                           max(0, dy) : min(0, dy)]
+            new = inten[max(0, -dx) : min(0, -dx),
+                        max(0, -dy) : min(0, -dy)]
+            co = (msk[dx+smooth_contant, dy+smooth_contant] *
+                  np.abs((new - origin) * origin))
 
 if __name__ == "__main__":
     obj = HDR()
@@ -159,4 +194,21 @@ if __name__ == "__main__":
     obj.openImage(r"./data/PPT範例暗圖.png", -1)
     obj.alignment()
     obj.makeHDR(r"./hdr圖.exr")
-    cv2.waitKey(0)
+    # a: float = 1.0
+    # b: float = 0.0
+    # Lwhite: float = 1e10
+    # while True:
+    #     print(f"a:{a}\tb:{b}\tLwhite:{Lwhite}")
+    #     obj.tonemappingL(r"./toneL.png", a=a, b=b, Lwhite=Lwhite)
+    #     cv2.imshow("tonemapping", obj.tone)
+    #     cv2.waitKey(0)
+    #     inp = input()
+    #     var, val = inp.split("=")
+    #     if var == "a":
+    #         a = float(val)
+    #     elif var == "b":
+    #         b = float(val)
+    #     elif var == "Lwhite":
+    #         Lwhite = float(val)
+    #     else:
+    #         print("清輸入合法變數")
