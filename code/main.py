@@ -176,26 +176,29 @@ class HDR:
         print("tonemapping...")
         inten = np.mean(self.hdr, axis=-1)
         color = self.hdr / np.expand_dims(inten, axis=-1)
-        msk = np.stack(np.indices((smooth_contant*2+1,
-                                   smooth_contant*2+1)), axis=-1)
-        msk = np.sum(np.power(msk - smooth_contant, 2), axis=-1)
-        msk = np.exp(-msk / (smooth_contant * smooth_contant / 2))
-        msk /= smooth_contant * math.sqrt(math.pi / 2)
-        div_up = np.zeros(inten.shape, dtype=np.float64)
-        div_down = np.zeros(inten.shape, dtype=np.float64)
-        for dx in trange(-smooth_contant, smooth_contant+1, unit="row"):
-            for dy in range(-smooth_contant, smooth_contant+1):
-                origin = inten[max(0, dx) : inten.shape[0] + min(0, dx),
-                            max(0, dy) : inten.shape[1] + min(0, dy)]
-                new = inten[max(0, -dx) : inten.shape[0] + min(0, -dx),
-                            max(0, -dy) : inten.shape[1] + min(0, -dy)]
-                co = (msk[dx+smooth_contant, dy+smooth_contant] *
-                    np.exp(-np.power((new - origin) / origin, 2) * 10))
-                div_up[max(0, dx) : inten.shape[0] + min(0, dx),
-                    max(0, dy) : inten.shape[1] + min(0, dy)] += co * new
-                div_down[max(0, dx) : inten.shape[0] + min(0, dx),
-                        max(0, dy) : inten.shape[1] + min(0, dy)] += co
-        inten_smooth = div_up / div_down
+        if not hasattr(self, "inten_smooth"):
+            msk = np.stack(np.indices((smooth_contant*2+1,
+                                    smooth_contant*2+1)), axis=-1)
+            msk = np.sum(np.power(msk - smooth_contant, 2), axis=-1)
+            msk = np.exp(-msk / (smooth_contant * smooth_contant / 2))
+            msk /= smooth_contant * math.sqrt(math.pi / 2)
+            div_up = np.zeros(inten.shape, dtype=np.float64)
+            div_down = np.zeros(inten.shape, dtype=np.float64)
+            for dx in trange(-smooth_contant, smooth_contant+1, unit="row"):
+                for dy in range(-smooth_contant, smooth_contant+1):
+                    origin = inten[max(0, dx) : inten.shape[0] + min(0, dx),
+                                max(0, dy) : inten.shape[1] + min(0, dy)]
+                    new = inten[max(0, -dx) : inten.shape[0] + min(0, -dx),
+                                max(0, -dy) : inten.shape[1] + min(0, -dy)]
+                    co = (msk[dx+smooth_contant, dy+smooth_contant] *
+                        np.exp(-np.power((new - origin) / origin, 2) * 10))
+                    div_up[max(0, dx) : inten.shape[0] + min(0, dx),
+                        max(0, dy) : inten.shape[1] + min(0, dy)] += co * new
+                    div_down[max(0, dx) : inten.shape[0] + min(0, dx),
+                            max(0, dy) : inten.shape[1] + min(0, dy)] += co
+            inten_smooth = div_up / div_down
+            self.inten_smooth = inten_smooth
+        inten_smooth = self.inten_smooth
         inten_fre = (inten - inten_smooth) / inten_smooth
         inten_smooth = np.log(inten_smooth)
         inten_smooth = ((inten_smooth - np.min(inten_smooth))
@@ -212,28 +215,29 @@ class HDR:
 
 if __name__ == "__main__":
     obj = HDR()
-    obj.openImage(r"./data/PPT範例亮圖.png", 0)
-    obj.openImage(r"./data/PPT範例暗圖.png", -1)
+    while True:
+        filename = input("請輸入原始圖檔(結束則直接enter):")
+        if filename == "":
+            break
+        ltime = int(input("請輸入該圖曝光時間對2的對數:"))
+        obj.openImage(filename, ltime)
     obj.alignment()
-    obj.makeHDR(r"./hdr圖.exr")
-    obj.tonemappingBil("./toneBil.png")
-    cv2.imshow("tone", obj.tone)
-    cv2.waitKey(0)
-    # a: float = 1.0
-    # b: float = 0.0
-    # Lwhite: float = 1e10
-    # while True:
-    #     print(f"a:{a}\tb:{b}\tLwhite:{Lwhite}")
-    #     obj.tonemappingL(r"./toneL.png", a=a, b=b, Lwhite=Lwhite)
-    #     cv2.imshow("tonemapping", obj.tone)
-    #     cv2.waitKey(0)
-    #     inp = input()
-    #     var, val = inp.split("=")
-    #     if var == "a":
-    #         a = float(val)
-    #     elif var == "b":
-    #         b = float(val)
-    #     elif var == "Lwhite":
-    #         Lwhite = float(val)
-    #     else:
-    #         print("清輸入合法變數")
+    filename = input("請輸入輸出HDR檔檔名(無則直接enter):")
+    if filename == "":
+        filename = None
+    obj.makeHDR(filename)
+    filename = input("請輸入輸出tonemapping結果圖檔(無則直接enter):")
+    if filename == "":
+        filename = None
+    attrs = {"smooth_min": 0, "smooth_max": 256,
+                       "fre_coutant": 256}
+    while True:
+        print(f"參數們: {attrs}")
+        obj.tonemappingBil(filename)
+        cv2.imshow("tone", obj.tone)
+        cv2.waitKey(0)
+        inp = input("修改參數方法為「[參數名稱]=[修改數值]」，若無則直接enter:")
+        if inp == "":
+            break
+        name, value = inp.split("=")
+        attrs[name] = value
