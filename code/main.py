@@ -172,7 +172,7 @@ class HDR:
     
     def tonemappingBil(self, filename: str = None, smooth_contant: int = 20,
                        smooth_min: int = 0, smooth_max: int = 256,
-                       fre_contant: int = 256):
+                       fre_contant: int = 160):
         print("tonemapping...")
         inten = np.mean(self.hdr, axis=-1)
         color = self.hdr / np.expand_dims(inten, axis=-1)
