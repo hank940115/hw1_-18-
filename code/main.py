@@ -172,7 +172,7 @@ class HDR:
     
     def tonemappingBil(self, filename: str = None, smooth_contant: int = 20,
                        smooth_min: int = 0, smooth_max: int = 256,
-                       fre_coutant: int = 256):
+                       fre_contant: int = 256):
         print("tonemapping...")
         inten = np.mean(self.hdr, axis=-1)
         color = self.hdr / np.expand_dims(inten, axis=-1)
@@ -205,7 +205,7 @@ class HDR:
                         * (smooth_max - smooth_min)
                         / (np.max(inten_smooth) - np.min(inten_smooth))
                         + smooth_min)
-        inten = inten_smooth + inten_fre * fre_coutant
+        inten = inten_smooth + inten_fre * fre_contant
         tone = np.clip(np.expand_dims(inten, axis=-1)
                         * color, 0, 255).astype(np.uint8)
         print("tonemapping finish")
@@ -230,14 +230,14 @@ if __name__ == "__main__":
     if filename == "":
         filename = None
     attrs = {"smooth_min": 0, "smooth_max": 256,
-                       "fre_coutant": 256}
+                       "fre_contant": 256}
     while True:
         print(f"參數們: {attrs}")
-        obj.tonemappingBil(filename)
+        obj.tonemappingBil(filename, **attrs)
         cv2.imshow("tone", obj.tone)
         cv2.waitKey(0)
         inp = input("修改參數方法為「[參數名稱]=[修改數值]」，若無則直接enter:")
         if inp == "":
             break
         name, value = inp.split("=")
-        attrs[name] = value
+        attrs[name] = int(value)
